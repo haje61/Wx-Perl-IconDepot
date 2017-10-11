@@ -1,0 +1,6 @@
+Changes
+Makefile.PL
+MANIFEST
+README
+t/Wx-Perl-IconDepot.t
+lib/Wx/Perl/IconDepot.pm
