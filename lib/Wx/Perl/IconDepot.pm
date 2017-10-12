@@ -2,7 +2,7 @@ package Wx::Perl::IconDepot;
 
 =head1 NAME
 
-Wx::Perl::IconDepot - Handle icon libraries quick & easy
+Wx::Perl::IconDepot - Use icon libraries quick & easy
 
 =cut
 
@@ -15,8 +15,6 @@ our $VERSION = '0.01';
 use Wx qw( :image );
 use File::Basename;
 use Module::Load::Conditional qw( check_install );
-
-my @subfolder_ignore = qw( cursors );
 
 my %imgext = (
 	'.jpg' => wxBITMAP_TYPE_JPEG,
@@ -43,6 +41,7 @@ if ($^O eq 'MSWin32') {
 	push @iconpath, '/usr/share/icons',
 }
 
+###############################################################################
 =head1 SYNOPSIS
 
 =over 4
@@ -57,6 +56,27 @@ if ($^O eq 'MSWin32') {
 
 =head1 DESCRIPTION
 
+This module allows B<Wx> easy access to icon libraries used in desktops
+like KDE and GNOME.
+
+It supports libraries containing scalable vector graphics like Breeze if
+B<Image::LibRSVG> is installed. If not you are confined to bitmapped libraries
+like Oxygen or Adwaita.
+
+On Windows you have to install icon libraries yourself in C:\ProgramData\Icons.
+You will find plenty of them on Github. Extract an icon set and copy the main
+folder of the theme (the one that contains the file 'index.theme') to
+C:\ProgramData\Icons. On Linux you will probably find some icon themes
+in /usr/share/icons.
+
+The constructor takes a reference to a list of folders where it finds the icons
+libraries. If you specify nothing, it will assign default values for:
+
+Windows:  $ENV{ALLUSERSPROFILE} . '\Icons'. IconDepot will not create 
+the folder if it does not exist.
+
+Others: $ENV{HOME} . '/.local/share/icons', '/usr/share/icons'
+
 =cut
 
 sub new {
@@ -69,6 +89,8 @@ sub new {
    my $pathlist = shift;
    unless (defined $pathlist) { $pathlist = \@iconpath };
 
+   $self->{ACTIVE} = [];
+   $self->{ACTIVENAMES} = [];
    $self->{DEFAULTSIZE} = 22;
    $self->{FORCEIMAGE} = 1;
    $self->{INDEX} = undef;
@@ -84,6 +106,178 @@ sub new {
 
 =over 4
 
+=cut
+
+###############################################################################
+=item B<AvailableContexts>I<($theme, $name, $size);
+
+=over 4
+
+Returns a list of available contexts. If you set $name to undef if will return
+all contexts of size $size. If you set $size to undef it will return all
+contexts associated with icon $name. If you set $name and $size to undef it
+will return all known contexts in the theme. out $size it returns a list
+of all contexts found in $theme.
+
+=back
+
+=cut
+
+sub AvailableContexts {
+	my ($self, $theme, $name, $size) = @_;
+	my $t = $self->GetTheme($theme);
+	my %found = ();
+	if ((not defined $name) and (not defined $size)) {
+		my @names = keys %$t;
+		for (@names) {
+			my $si = $t->{$_};
+			my @sizes = keys %$si;
+			for (@sizes) {
+				my $ci = $si->{$_};
+				for (keys %$ci) {
+					$found{$_} = 1;
+				}
+			}
+		}
+	} elsif ((defined $name) and (not defined $size)) {
+		if (exists $t->{$name}) {
+			my $si = $t->{$name};
+			my @sizes = keys %$si;
+			for (@sizes) {
+				my $ci = $si->{$_};
+				for (keys %$ci) {
+					$found{$_} = 1;
+				}
+			}
+		}
+	} elsif ((not defined $name) and (defined $size)) {
+		my @names = keys %$t;
+		for (@names) {
+			if (exists $t->{$_}->{$size}) {
+				my $ci = $t->{$_}->{$size};
+				for (keys %$ci) {
+					$found{$_} = 1;
+				}
+			}
+		}
+	} else {
+		if (exists $t->{$name}) {
+			my $si = $t->{$name};
+			if (exists $si->{$size}) {
+				my $ci = $si->{$size};
+				%found = %$ci
+			}
+		}
+	}
+	return sort keys %found
+}
+
+###############################################################################
+=item B<AvailableIcons>I<($theme, $size, $context);
+
+=over 4
+
+Returns a list of available icons. If you set $size to undef the list will 
+contain names it found in all sizes. If you set $context to undef it will return
+names it found in all contexts. If you leave out both then
+you get a list of all available icons. Watch out, it might be pretty long.
+
+=back
+
+=cut
+
+sub AvailableIcons {
+	my ($self, $theme, $size, $context) = @_;
+	my $t = $self->GetTheme($theme);
+
+	my @names = keys %$t;
+	my @matches = ();
+	if ((not defined $size) and (not defined $context)) {
+		@matches = @names
+	} elsif ((defined $size) and (not defined $context)) {
+		for (@names) {
+			if (exists $t->{$_}->{$size}) { push @matches, $_ }
+		}
+	} elsif ((not defined $size) and (defined $context)) {
+		for (@names) {
+			my $name = $_;
+			my $si = $t->{$name};
+			my @sizes = keys %$si;
+			for (@sizes) {
+				if (exists $t->{$name}->{$_}->{$context}) { push @matches, $name }
+			}
+		}
+	} else {
+		for (@names) {
+			if (exists $t->{$_}->{$size}) {
+				my $c = $t->{$_}->{$size};
+				if (exists $c->{$context}) {
+					push @matches, $_
+				}
+			}
+		}
+	}
+	return sort @matches
+}
+
+###############################################################################
+=item B<AvailableSizes>I<($theme, $name, $context);
+
+=over 4
+
+Returns a list of available contexts. If you leave out $size it returns a list
+of all contexts found in $theme.
+
+=back
+
+=cut
+
+sub AvailableSizes {
+	my ($self, $theme, $name, $context) = @_;
+	my $t = $self->GetTheme($theme);
+
+	my %found = ();
+	if ((not defined $name) and (not defined $context)) {
+		my @names = keys %$t;
+		for (@names) {
+			my $si = $t->{$_};
+			my @sizes = keys %$si;
+			for (@sizes) {
+				$found{$_} = 1
+			}
+		}
+	} elsif ((defined $name) and (not defined $context)) {
+		if (exists $t->{$name}) {
+			my $si = $t->{$name};
+			%found = %$si;
+		}
+	} elsif ((not defined $name) and (defined $context)) {
+		my @names = keys %$t;
+		for (@names) {
+			my $n = $_;
+			my $si = $t->{$n};
+			my @sizes = keys %$si;
+			for (@sizes) {
+				if (exists $t->{$n}->{$_}->{$context}) {
+					$found{$_} = 1
+				}
+			}
+		}
+	} else {
+		if (exists $t->{$name}) {
+			my $si = $t->{$name};
+			my @sizes = keys %$si;
+			for (@sizes) {
+				if (exists $t->{$name}->{$_}->{$context}) {
+					$found{$_} = 1
+				}
+			}
+		}
+	}
+	return sort {$a <=> $b} keys %found
+}
+
+###############################################################################
 =item B<AvailableThemes>
 
 =over 4
@@ -100,14 +294,16 @@ sub AvailableThemes {
 	return sort keys %$k
 }
 
+###############################################################################
 =item B<FindImage>I<($name, $size, $context, \$resize)>
 
 =over 4
 
-Returns the filename of an image in the library. Finds the best suitable version of
-the image in the library according to $size and $context. If it eventually returns
-an image of another size, it sets $resize to 1. This gives the opportunity to scale
-the image to the right icon size. All parameters except $name are optional.
+Returns the filename of an image in the library. Finds the best suitable
+version of the image in the library according to $size and $context. If it
+eventually returns an image of another size, it sets $resize to 1. This gives
+the opportunity to scale the image to the requested icon size. All parameters
+except $name are optional.
 
 =back
 
@@ -127,13 +323,32 @@ sub FindImage {
 	return undef;
 }
 
-=item B<GetBitmap>I<($name, $size, $force)>
+###############################################################################
+=item B<GetActiveThemes>
 
 =over 4
 
-Returns a Wx::Bitmap object. If you do not specify I<$size> or the icon does not exist in the specified size, it will return the largest
-possible icon. I<$force> can be 0 or 1. It is 0 by default. If you set it to 1 a missing icon image is returned instead of undef when the icon cannot be
-found.
+Returns a list of active themes. Primary theme first then the fallback themes.
+
+=back
+
+=cut
+
+sub GetActiveThemes {
+	my $self = shift;
+	my $a = $self->{ACTIVENAMES};
+	return @$a
+}
+
+###############################################################################
+=item B<GetBitmap>I<($name>, [ I<$size, $context, $force> ] I<)>
+
+=over 4
+
+Returns a Wx::Bitmap object. If you do not specify I<$size> or the icon does
+not exist in the specified size, it will return the largest possible icon.
+I<$force> can be 0 or 1. It is 0 by default. If you set it to 1 a missing icon
+image is returned instead of undef when the icon cannot be found.
 
 =back
 
@@ -144,13 +359,15 @@ sub GetBitmap {
 	return Wx::Bitmap->new($self->GetImage(@_))
 }
 
-=item B<GetIcon>I<($name, $size, $force)>
+###############################################################################
+=item B<GetIcon>I<($name>, [ I<$size, $context, $force> ] I<)>
 
 =over 4
 
-Returns a Wx::Icon object. If you do not specify I<$size> or the icon does not exist in the specified size, it will return the largest
-possible icon. I<$force> can be 0 or 1. It is 0 by default. If you set it to 1 a missing icon image is returned instead of undef when the icon cannot be
-found.
+Returns a Wx::Icon object. If you do not specify I<$size> or the icon does not
+exist in the specified size, it will return the largest possible icon.
+I<$force> can be 0 or 1. It is 0 by default. If you set it to 1 a missing icon
+image is returned instead of undef when the icon cannot be found.
 
 =back
 
@@ -164,13 +381,16 @@ sub GetIcon {
 	return $icon
 }
 
-=item B<GetImage>I<($name, $size, $force)>
+###############################################################################
+=item B<GetImage>I<($name>, [ I<$size, $context, $force> ] I<)>
 
 =over 4
 
-Returns a Wx::Image object. If you do not specify I<$size> or the icon does not exist in the specified size, it will find the largest
-possible icon and scale it to the requested size. I<$force> can be 0 or 1. It is 0 by default. If you set it to 1 a missing icon 
-image is returned instead of undef when the icon cannot be found.
+Returns a Wx::Image object. If you do not specify I<$size> or the icon does
+not exist in the specified size, it will find the largest possible icon and
+scale it to the requested size. I<$force> can be 0 or 1. It is 0 by default.
+If you set it to 1 a missing icon image is returned instead of undef when the
+icon cannot be found.
 
 =back
 
@@ -197,6 +417,7 @@ sub GetImage {
 	return undef
 }
 
+###############################################################################
 =item B<GetThemePath>I<($theme)>
 
 =over 4
@@ -217,6 +438,7 @@ sub GetThemePath {
 	}
 }
 
+###############################################################################
 =item B<IsImageFile>I<($file)>
 
 =over 4
@@ -235,6 +457,7 @@ sub IsImageFile {
 	return 0
 }
 
+###############################################################################
 =item B<LoadImage>I<($file)>
 
 =over 4
@@ -272,12 +495,14 @@ sub LoadImage {
    return undef
 }
 
+###############################################################################
 =item B<SetThemes>I<($theme1, $theme2, $theme3)>
 
 =over 4
 
-Initializes themes. I<$theme1> is the primary theme. The rest are subsequent fallback themes. Suggestion
-to use your favourite theme as the first one and the theme that has the most icons as the last one.
+Initializes themes. I<$theme1> is the primary theme. The rest are subsequent
+fallback themes. I suggest to use your favourite theme as the first one and
+the theme that has the most icons as the last one.
 
 =back
 
@@ -295,16 +520,20 @@ sub SetThemes {
 	$self->{ACTIVE} = \@active;
 }
 
+###############################################################################
 =back
 
 =head1 PRIVATE METHODS
 
 =over 4
 
+=cut
+
+###############################################################################
 =item B<CollectThemes>
 
-Called during initialization. It scans the folders the constructor receives for icon libraries.
-It loads their index files and stores the info.
+Called during initialization. It scans the folders the constructor receives for
+icon libraries. It loads their index files and stores the info.
 
 =over 4
 
@@ -324,7 +553,7 @@ sub CollectThemes {
 				if (-d $fullname) {
 					if (-e "$fullname/index.theme") {
 						my $index = $self->LoadThemeFile($fullname);
-						my $main = delete $index->{'Icon Theme'};
+						my $main = delete $index->{general};
 						if (%$index) {
 							my $name = $entry;
 							if (exists $main->{Name}) {
@@ -345,11 +574,13 @@ sub CollectThemes {
 	return \%themes
 }
 
+###############################################################################
 =item B<CreateIndex>I<($themeindex)>
 
 =over 4
 
-Creates a searchable index from a loaded theme index file. returns a reference to a hash.
+Creates a searchable index from a loaded theme index file. Returns a reference
+to a hash.
 
 =back
 
@@ -386,12 +617,14 @@ sub CreateIndex {
 	return \%index;
 }
 
+###############################################################################
 =item B<FindImageC>I<($sizeindex, $context)>
 
 =over 4
 
-Looks for an icon in $context for a given size index (a portion of a searchable index). If it can not find it
-it looks for another version in all other contexts. Returns the first one it finds.
+Looks for an icon in $context for a given size index (a portion of a searchable
+index). If it can not find it, it looks for another version in all other 
+contexts. Returns the first one it finds.
 
 =back
 
@@ -410,12 +643,14 @@ sub FindImageC {
 	return undef
 }
 
-=item B<FindImageS>I<($nameindex, $size, $context)>
+###############################################################################
+=item B<FindImageS>I<($nameindex, $size, $context, \$resize)>
 
 =over 4
 
-Looks for an icon of $size for a given name index (a portion of a searchable index). If it can not find it
-it looks for another version in all other sizes. Returns the biggest one it finds.
+Looks for an icon of $size for a given name index (a portion of a searchable
+index). If it can not find it it looks for another version in all other sizes.
+In this case it returns the biggest one it finds and sets $resize to 1.
 
 =back
 
@@ -438,6 +673,7 @@ sub FindImageS {
 	return undef
 }
 
+###############################################################################
 =item B<FindINC>I<($file)>
 
 =over 4
@@ -459,6 +695,7 @@ sub FindINC {
    return undef;
 }
 
+###############################################################################
 =item B<GetMissingImage>I<($size)>
 
 =over 4
@@ -475,6 +712,7 @@ sub GetMissingImage {
 	return $tmp->Scale($size, $size, wxIMAGE_QUALITY_HIGH)
 }
 
+###############################################################################
 =item B<GetTheme>I<($themename)>
 
 =over 4
@@ -495,7 +733,7 @@ sub GetTheme {
 		my $themindex = $self->{THEMES}->{$theme};
 		if (defined $themindex) {
 			my $index = $self->CreateIndex($themindex);
-			$pool->{$theme} = $themindex;
+			$pool->{$theme} = $index;
 			return $index
 		} else {
 			warn "Setting theme '$theme' failed"
@@ -503,6 +741,7 @@ sub GetTheme {
 	}
 }
 
+###############################################################################
 =item B<LoadThemeFile>I<($file)>
 
 =over 4
@@ -522,25 +761,38 @@ sub LoadThemeFile {
 			my %index = ();
 			my $section;
 			my %inf = ();
-			while (<OFILE>) {
-				my $line = $_;
-				chomp $line;
-				if ($line =~ /^\[([^\]]+)\]/) { #new section
-					if (defined $section) { $index{$section} = { %inf } }
-					$section = $1;
-					%inf = ();
-				} elsif ($line =~ s/^([^=]+)=//) {#new key
-					$inf{$1} = $line;
+			my $firstline = <OFILE>;
+			unless ($firstline =~ /^\[.+\]$/) {
+				warn "Illegal file format $file";
+			} else {
+				while (<OFILE>) {
+					my $line = $_;
+					chomp $line;
+					if ($line =~ /^\[([^\]]+)\]/) { #new section
+						if (defined $section) { 
+							$index{$section} = { %inf } 
+						} else {
+							$index{general} = { %inf } 
+						}
+						$section = $1;
+						%inf = ();
+					} elsif ($line =~ s/^([^=]+)=//) { #new key
+						$inf{$1} = $line;
+					}
 				}
+				if (defined $section) { 
+					$index{$section} = { %inf } 
+				}
+				close OFILE;
 			}
-			$index{$section} = { %inf };
-			close OFILE;
 			return \%index;
 		} else {
 			warn "Cannot open theme index file: $file"
 		}
 	}
 }
+
+###############################################################################
 
 =back
 
@@ -552,13 +804,10 @@ Hans Jeuken (hansjeuken at xs4all dot nl)
 
 If you find any, please contact the author.
 
-Icon libararies that depend on .svg images are shown in the list of I<AvailableThemes>.
-However they are useless. It cannot be prevented without heavy delving into the icon libary
-itself, which would impose a start up penalty.
+Icon libararies that depend on .svg images show up in the list of 
+B<AvailableThemes> when no support for scalable vector graphics is available.
 
 =head1 TODO
-
-Add support for .svg icons.
 
 =cut
 
