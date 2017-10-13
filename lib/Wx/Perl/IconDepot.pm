@@ -10,7 +10,7 @@ use strict;
 use warnings;
 
 use vars qw($VERSION);
-our $VERSION = '0.01';
+our $VERSION = '0.02';
 
 use Wx qw( :image );
 use File::Basename;
@@ -46,7 +46,7 @@ if ($^O eq 'MSWin32') {
 
 =over 4
 
- my $depot = new Wx::Perl::IconDepot(@pathnames);
+ my $depot = new Wx::Perl::IconDepot(\@pathnames);
  $depot->SetThemes($theme1, $theme2, $theme3);
  my $wxbitmap = $depot->GetBitmap($name, $size, $context)
  my $wxicon = $depot->GetIcon($name, $size, $context)
