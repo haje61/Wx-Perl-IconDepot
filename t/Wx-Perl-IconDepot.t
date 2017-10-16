@@ -2,16 +2,22 @@
 use strict;
 use warnings;
 
-use Test::More tests => 205;
+use Test::More;
 BEGIN { use_ok('Wx::Perl::IconDepot') };
 
 use Wx;
-use Module::Load::Conditional qw( check_install );
+use Module::Load::Conditional qw( can_load );
 use Data::Dumper; 
 
 my $no_svg_support = 0;
-unless (check_install(module => 'Image::LibRSVG')) { $no_svg_support = 1 }
+my $tests = 205;
+unless (can_load(modules => {'Image::LibRSVG' => '0.07'})) { 
+	$no_svg_support = 1 ;
+	$tests = 133;
+}
+
 print "No SVG support: $no_svg_support\n";
+
 
 my @iconpath = ('t/Themes');
 my @theme = qw( png_1 png_2 svg_1 );
@@ -286,29 +292,28 @@ for (@tests) {
 			&PrintListResult($expected, \@result);
 		}
 	} elsif ($validate eq 'image') {
-		SKIP: {
-			skip 'Image::LibRSVG is not installed', 2 if ($is_svg and $no_svg_support);
-			my $img = $result[0];
-			my $outcome = 0;
-			if ((defined $img) and ($img->IsOk)) { $outcome = 1 }
-			if ($expected eq $outcome) {
-				ok(1, $name);
-			} else {
-				ok(1, $name);
-				print "Expected: $expected\n";
-				print "     Got: $outcome\n";
-			}
-			if (defined $checksize) {
-				SKIP: {
-					skip 'Previous test returned no image.', 1 unless $outcome;
-					ok((($img->GetHeight eq $checksize) and ($img->GetWidth eq $checksize)), 'Check size');
-				}
+		my $img = $result[0];
+		my $outcome = 0;
+		if ((defined $img) and ($img->IsOk)) { $outcome = 1 }
+		if ($expected eq $outcome) {
+			ok(1, $name);
+		} else {
+			ok(1, $name);
+			print "Expected: $expected\n";
+			print "     Got: $outcome\n";
+		}
+		if (defined $checksize) {
+			SKIP: {
+				skip 'Previous test returned no image.', 1 unless $outcome;
+				ok((($img->GetHeight eq $checksize) and ($img->GetWidth eq $checksize)), 'Check size');
 			}
 		}
 	} else {
 		ok(&$validate($expected, \@result), $name);
 	}
 }
+
+done_testing($tests);
 
 sub CreateImageTests {
 	my ($nms, $szs, $empty) = @_;

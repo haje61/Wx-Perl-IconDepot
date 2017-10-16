@@ -14,7 +14,7 @@ our $VERSION = '0.02';
 
 use Wx qw( :image );
 use File::Basename;
-use Module::Load::Conditional qw( check_install );
+use Module::Load::Conditional qw( can_load );
 
 my %imgext = (
 	'.jpg' => wxBITMAP_TYPE_JPEG,
@@ -26,9 +26,8 @@ my %imgext = (
 );
 my @extensions = (keys %imgext);
 
-if (check_install( module => 'Image::LibRSVG' )) {
+if (can_load(modules => {'Image::LibRSVG' => '0.07'})) {
 	push @extensions, '.svg';
-	use Image::LibRSVG;
 	use IO::Scalar;
 }
 
@@ -109,7 +108,7 @@ sub new {
 =cut
 
 ###############################################################################
-=item B<AvailableContexts>I<($theme, $name, $size);
+=item B<AvailableContexts>I<($theme, >[ I<$name, $size> ] I<);>
 
 =over 4
 
@@ -173,7 +172,7 @@ sub AvailableContexts {
 }
 
 ###############################################################################
-=item B<AvailableIcons>I<($theme, $size, $context);
+=item B<AvailableIcons>I<($theme, >[ I<$size, $context> ] I<);>
 
 =over 4
 
@@ -221,7 +220,7 @@ sub AvailableIcons {
 }
 
 ###############################################################################
-=item B<AvailableSizes>I<($theme, $name, $context);
+=item B<AvailableSizes>I<($theme, >[ I<$name, $context> ] I<);>
 
 =over 4
 
@@ -295,7 +294,7 @@ sub AvailableThemes {
 }
 
 ###############################################################################
-=item B<FindImage>I<($name, $size, $context, \$resize)>
+=item B<FindImage>I<($name, >[ I<$size, $context, \$resize> ] I<);>
 
 =over 4
 
@@ -341,7 +340,7 @@ sub GetActiveThemes {
 }
 
 ###############################################################################
-=item B<GetBitmap>I<($name>, [ I<$size, $context, $force> ] I<)>
+=item B<GetBitmap>I<($name>, [ I<$size, $context, $force> ] I<);>
 
 =over 4
 
@@ -360,7 +359,7 @@ sub GetBitmap {
 }
 
 ###############################################################################
-=item B<GetIcon>I<($name>, [ I<$size, $context, $force> ] I<)>
+=item B<GetIcon>I<($name>, [ I<$size, $context, $force> ] I<);>
 
 =over 4
 
@@ -382,7 +381,7 @@ sub GetIcon {
 }
 
 ###############################################################################
-=item B<GetImage>I<($name>, [ I<$size, $context, $force> ] I<)>
+=item B<GetImage>I<($name>, [ I<$size, $context, $force> ] I<);>
 
 =over 4
 
@@ -496,7 +495,7 @@ sub LoadImage {
 }
 
 ###############################################################################
-=item B<SetThemes>I<($theme1, $theme2, $theme3)>
+=item B<SetThemes>I<($theme1, >[ I<$theme2, $theme3> ] I<);>
 
 =over 4
 
