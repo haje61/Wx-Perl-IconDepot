@@ -1,0 +1,50 @@
+#!/usr/bin/perl -w
+use strict;
+use warnings;
+
+use Wx;
+
+package AppFrame;
+
+use Wx qw( :frame :sizer);
+use Wx::Perl::IconDepot::Browser;
+use base qw(Tk::Frame);
+
+sub new {
+	my $class = shift;
+    my $self = $class->SUPER::new(@_);
+    my $sizer = Wx::BoxSizer->new(wxVERTICAL);
+    $self->SetSizer($sizer);
+    my $browser = Wx::Perl::IconDepot::Browser->new($self, -1);
+    $sizer->Add($browser, 1, wxEXPAND);
+    $self->Layout;
+    $self->Fit;
+}
+
+package IconBrowserApp;
+
+use base qw(Wx::App);   # Inherit from Wx::App
+
+sub OnInit
+# Every application has its own OnInit method that will
+# be called when the constructor is called.
+{
+   my $self = shift;
+   my $frame = Wx::Perl::IconDepot::Browser->new( undef,         # Parent window
+                               -1,            # Window id
+                               'Icon browser', # Title
+                               [1,1],         # position X, Y
+                               [200, 150]     # size X, Y
+                             );
+   $self->SetTopWindow($frame);    # Define the toplevel window
+   $frame->Show(1);                # Show the frame
+}
+
+###########################################################
+#
+# The main program
+#
+package main;
+
+my $wxobj = IconBrowserApp->new(); # New HelloWorld application
+$wxobj->MainLoop;

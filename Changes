@@ -10,3 +10,9 @@ Version 0.02 October 16, 2017
    Corrected some errors in documentation
    Added this file
 
+Version 0.03
+
+   Added module Wx::Perl::IconDepot::Viewer
+   Added module Wx::Perl::IconDepot::Browser
+   Added script iconbrowser
+   
