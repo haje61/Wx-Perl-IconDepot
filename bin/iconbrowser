@@ -8,17 +8,18 @@ package AppFrame;
 
 use Wx qw( :frame :sizer);
 use Wx::Perl::IconDepot::Browser;
-use base qw(Tk::Frame);
+use base qw(Wx::Frame);
 
 sub new {
 	my $class = shift;
-    my $self = $class->SUPER::new(@_);
-    my $sizer = Wx::BoxSizer->new(wxVERTICAL);
-    $self->SetSizer($sizer);
-    my $browser = Wx::Perl::IconDepot::Browser->new($self, -1);
-    $sizer->Add($browser, 1, wxEXPAND);
-    $self->Layout;
-    $self->Fit;
+	my $self = $class->SUPER::new(@_);
+	my $sizer = Wx::BoxSizer->new(wxVERTICAL);
+	$self->SetSizer($sizer);
+	my $browser = Wx::Perl::IconDepot::Browser->new($self, -1);
+	$sizer->Add($browser, 1, wxEXPAND);
+	$self->Layout;
+	$self->Fit;
+	return $self;
 }
 
 package IconBrowserApp;
@@ -30,7 +31,7 @@ sub OnInit
 # be called when the constructor is called.
 {
    my $self = shift;
-   my $frame = Wx::Perl::IconDepot::Browser->new( undef,         # Parent window
+   my $frame = AppFrame->new( undef,         # Parent window
                                -1,            # Window id
                                'Icon browser', # Title
                                [1,1],         # position X, Y
@@ -40,10 +41,6 @@ sub OnInit
    $frame->Show(1);                # Show the frame
 }
 
-###########################################################
-#
-# The main program
-#
 package main;
 
 my $wxobj = IconBrowserApp->new(); # New HelloWorld application
