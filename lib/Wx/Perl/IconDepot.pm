@@ -10,7 +10,7 @@ use strict;
 use warnings;
 
 use vars qw($VERSION);
-our $VERSION = '0.03';
+our $VERSION = '0.04';
 
 use Wx qw( :image );
 use File::Basename;
@@ -234,6 +234,7 @@ of all contexts found in $theme.
 sub AvailableSizes {
 	my ($self, $theme, $name, $context) = @_;
 	my $t = $self->GetTheme($theme);
+	return () unless defined $t;
 
 	my %found = ();
 	if ((not defined $name) and (not defined $context)) {
@@ -355,7 +356,11 @@ image is returned instead of undef when the icon cannot be found.
 
 sub GetBitmap {
 	my $self = shift;
-	return Wx::Bitmap->new($self->GetImage(@_))
+	my $img = $self->GetImage(@_);
+	if (defined($img)) {
+        return Wx::Bitmap->new($img)
+    }
+    return undef
 }
 
 ###############################################################################
@@ -373,11 +378,14 @@ image is returned instead of undef when the icon cannot be found.
 =cut
 
 sub GetIcon {
-   my $self = shift;
-	my $bmp = $self->GetBitmap(@_);
-	my $icon = Wx::Icon->new();
-	$icon->CopyFromBitmap($bmp);
-	return $icon
+    my $self = shift;
+    my $bmp = $self->GetBitmap(@_);
+    if (defined($bmp)) {
+        my $icon = Wx::Icon->new();
+        $icon->CopyFromBitmap($bmp);
+        return $icon
+    }
+    return undef
 }
 
 ###############################################################################
@@ -735,7 +743,8 @@ sub GetTheme {
 			$pool->{$theme} = $index;
 			return $index
 		} else {
-			warn "Setting theme '$theme' failed"
+			warn "Accessing theme '$theme' failed";
+			return undef
 		}
 	}
 }
@@ -754,41 +763,39 @@ It returns a reference to this hash.
 
 sub LoadThemeFile {
 	my ($self, $file) = @_;
-	if (defined $file) {
-		$file = "$file/index.theme";
-		if (open(OFILE, "<", $file)) {
-			my %index = ();
-			my $section;
-			my %inf = ();
-			my $firstline = <OFILE>;
-			unless ($firstline =~ /^\[.+\]$/) {
-				warn "Illegal file format $file";
-			} else {
-				while (<OFILE>) {
-					my $line = $_;
-					chomp $line;
-					if ($line =~ /^\[([^\]]+)\]/) { #new section
-						if (defined $section) { 
-							$index{$section} = { %inf } 
-						} else {
-							$index{general} = { %inf } 
-						}
-						$section = $1;
-						%inf = ();
-					} elsif ($line =~ s/^([^=]+)=//) { #new key
-						$inf{$1} = $line;
-					}
-				}
-				if (defined $section) { 
-					$index{$section} = { %inf } 
-				}
-				close OFILE;
-			}
-			return \%index;
-		} else {
-			warn "Cannot open theme index file: $file"
-		}
-	}
+    $file = "$file/index.theme";
+    if (open(OFILE, "<", $file)) {
+        my %index = ();
+        my $section;
+        my %inf = ();
+        my $firstline = <OFILE>;
+        unless ($firstline =~ /^\[.+\]$/) {
+            warn "Illegal file format $file";
+        } else {
+            while (<OFILE>) {
+                my $line = $_;
+                chomp $line;
+                if ($line =~ /^\[([^\]]+)\]/) { #new section
+                    if (defined $section) { 
+                        $index{$section} = { %inf }
+                    } else {
+                        $index{general} = { %inf }
+                    }
+                    $section = $1;
+                    %inf = ();
+                } elsif ($line =~ s/^([^=]+)=//) { #new key
+                    $inf{$1} = $line;
+                }
+            }
+            if (defined $section) { 
+                $index{$section} = { %inf } 
+            }
+            close OFILE;
+        }
+        return \%index;
+    } else {
+        warn "Cannot open theme index file: $file"
+    }
 }
 
 ###############################################################################
